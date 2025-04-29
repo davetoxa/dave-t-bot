@@ -1,43 +1,34 @@
-import { Telegraf } from 'telegraf'
+import { Telegraf } from "telegraf";
+import OpenAI from "openai";
 
-const bot = new Telegraf(process.env.BOT_TOKEN)
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-import { Configuration, OpenAIApi } from 'openai';
-const configuration = new Configuration({
-    organization: process.env.OPENAI_ORG_ID,
-    apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+const openai = new OpenAI();
 
-const keyBoard = JSON.stringify({keyboard: [ ['/Hey','/Buy', '/QA'] ]});
+bot.on("text", async (ctx) => {
+  const userText = ctx.message.text;
 
-bot.command('quit', (ctx) => {
-  ctx.telegram.leaveChat(ctx.message.chat.id)
-  ctx.leaveChat()
-})
+  try {
+    await ctx.sendChatAction("typing");
 
-bot.on('text', async (ctx) => {
-  const response = await openai.createCompletion('text-curie-001', {
-    prompt: ctx.update.message.text,
-    temperature: 0.8,
-    max_tokens: 256,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-  });
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [{ role: "user", content: userText }],
+    });
 
-  var AIResponse = response.data.choices[0].text
-  
-  console.log(AIResponse)
+    const botReply = completion.choices[0].message.content;
 
-  if (AIResponse != null){
-    // const username = ctx.update.message.from.username
-    // const message = `Привет @${username} 😏`
-    ctx.telegram.sendMessage(ctx.message.chat.id, AIResponse)
+    await ctx.reply(botReply);
+  } catch (err) {
+    console.error("OpenAI error:", err);
+    await ctx.reply(`❗️ Sorry, an error occurred ${err}`);
   }
-})
+});
 
-bot.launch()
+bot
+  .launch()
+  .then(() => console.log("Bot is active"))
+  .catch(console.error);
 
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'))
-process.once('SIGTERM', () => bot.stop('SIGTERM'))
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
